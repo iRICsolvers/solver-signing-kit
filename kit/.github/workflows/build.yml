@@ -48,12 +48,12 @@ jobs:
       contents: read
     steps:
     - name: Checkout solver repo
-      uses: actions/checkout@v2
+      uses: actions/checkout@v7
       with:
         path: ${{env.WORK_DIR}}
 
     - name: Checkout online_update repo
-      uses: actions/checkout@v2
+      uses: actions/checkout@v7
       with:
         repository: i-RIC/online_update_v4
         persist-credentials: false                # required to commit with a Personal access token
@@ -162,7 +162,7 @@ jobs:
     # Signed files are not committed back to the solver repo.
     - name: Set up Python for signing
       if: ${{ env.STATUS == 'public' || env.STATUS == 'develop' }}
-      uses: actions/setup-python@v5
+      uses: actions/setup-python@v7
       with:
         python-version: "3.13"
 
@@ -175,7 +175,7 @@ jobs:
 
     - name: Azure login for signing (OIDC)
       if: ${{ env.STATUS == 'public' || env.STATUS == 'develop' }}
-      uses: azure/login@v2
+      uses: azure/login@v3
       with:
         client-id: ${{ env.SIGNING_AZURE_CLIENT_ID }}
         tenant-id: ${{ env.SIGNING_AZURE_TENANT_ID }}
@@ -188,13 +188,20 @@ jobs:
         # use the Azure CLI login above instead of a client secret
         AZURE_SIGN_AUTH_MODE: managed-identity
       run: |
+        # stop with a clear message when the kit scripts were not committed
+        $kit = '.\${{env.WORK_DIR}}\tools\release'
+        $missing = @('sign-install.ps1', 'sign_binary.py', 'verify-signature.ps1') |
+          Where-Object { -not (Test-Path (Join-Path $kit $_)) }
+        if ($missing) {
+          throw "署名キットのファイルがコミットされていません: tools/release/$($missing -join ', tools/release/')"
+        }
         & .\${{env.WORK_DIR}}\tools\release\sign-install.ps1 `
           -InstallDir .\${{env.WORK_DIR}}\install `
           -ReportDir "$env:RUNNER_TEMP\signing-report"
 
     - name: Upload signing report
       if: ${{ always() && (env.STATUS == 'public' || env.STATUS == 'develop') }}
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@v7
       with:
         name: signing-report
         path: ${{ runner.temp }}/signing-report
